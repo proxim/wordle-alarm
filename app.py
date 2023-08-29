@@ -17,6 +17,11 @@ from utils import (
 )
 from sql import get_sql
 
+import time
+import atexit
+from apscheduler.schedulers.background import BackgroundScheduler
+from alarm import Alarm
+
 app = Flask(__name__)
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1)
 CORS(app)
@@ -26,6 +31,10 @@ limiter = Limiter(
     key_func=get_remote_address,
 )
 
+alarm = Alarm()
+
+def trigger_alarm():
+    return
 
 def api_response(json_data):
     resp = make_response(json.dumps(json_data))
@@ -147,4 +156,11 @@ def finish_game():
 
 
 if __name__ == "__main__":
+    scheduler = BackgroundScheduler()
+    scheduler.add_job(func=trigger_alarm, trigger="interval", seconds=60)
+    scheduler.start()
+
+    # Shut down the scheduler when exiting the app
+    atexit.register(lambda: scheduler.shutdown())
+
     app.run()

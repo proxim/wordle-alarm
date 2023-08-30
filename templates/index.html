@@ -17,7 +17,7 @@
 <body>
 <div id="vue-root">
     <header>
-        <h1>Wordle #[[ wordID ]]</h1>
+        <h1>ALARM: [[ alarmState ]]</h1>
     </header>
     <main>
         <div id="game">
@@ -32,7 +32,7 @@
         </div>
         <div class="end-popup-wrapper" v-if="answer">
             <div class="end-popup">
-                <h2>Results</h2>
+                <h2>ALARM: [[ alarmState ]]</h2>
                 <p>Answer: [[ answer ]]</p>
                 <div class="button-choice">
                     <button v-on:click="reset">New Game</button>

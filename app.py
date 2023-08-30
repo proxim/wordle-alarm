@@ -5,6 +5,7 @@ from flask import Flask, render_template, request, abort, make_response
 from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_apscheduler import APScheduler
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from utils import (
@@ -16,13 +17,17 @@ from utils import (
     get_random_answer,
 )
 from sql import get_sql
-
-import time
-import atexit
-from apscheduler.schedulers.background import BackgroundScheduler
+from playsound import playsound
 from alarm import Alarm
 
+# set configuration values
+class Config:
+    SCHEDULER_API_ENABLED = True
+
+base_url = '/api/v1'
+
 app = Flask(__name__)
+app.config.from_object(Config())
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1)
 CORS(app)
 
@@ -31,10 +36,11 @@ limiter = Limiter(
     key_func=get_remote_address,
 )
 
-alarm = Alarm()
+# initialize scheduler
+scheduler = APScheduler()
+scheduler.init_app(app)
 
-def trigger_alarm():
-    return
+alarm = Alarm()
 
 def api_response(json_data):
     resp = make_response(json.dumps(json_data))
@@ -54,7 +60,7 @@ def index():
 
 
 # API endpoints
-@app.route("/api/v1/start_game/", methods=["POST"])
+@app.route(f'{base_url}/start_game/', methods=["POST"])
 @limiter.limit("4/second;120/minute;600/hour;4000/day")
 def start_game():
     """
@@ -82,13 +88,13 @@ def start_game():
     return api_response({"id": cur.lastrowid, "key": key, "wordID": word_id})
 
 
-@app.route("/api/v1/guess/", methods=["POST"])
+@app.route(f'{base_url}/guess/', methods=["POST"])
 def guess_word():
     guess = request.get_json(force=True)["guess"]
-
+    # validate guess
     if not (len(guess) == 5 and guess.isalpha() and word_is_valid(guess)):
         return abort(400, "Invalid word")
-
+    # retrieve game id
     game_id = id_or_400(request)
 
     con, cur = get_sql()
@@ -142,11 +148,19 @@ def guess_word():
             }
             guessed_pos.add(pos)
             break
-
+    # if guess is correct then disarm and turn off the alarm
+    all_correct = True
+    for letter in guess_status:
+        if letter.get('state') != 2:
+            all_correct = False
+    if all_correct:
+        alarm.disarm()
+        alarm.deactivate()
+    
     return api_response(guess_status)
 
 
-@app.route("/api/v1/finish_game/", methods=["POST"])
+@app.route(f'{base_url}/finish_game/', methods=["POST"])
 def finish_game():
     game_id = id_or_400(request)
     set_finished(game_id)
@@ -154,13 +168,36 @@ def finish_game():
 
     return api_response({"answer": answer})
 
+@app.route(f'{base_url}/alarm_time/', methods=['GET'])
+def get_alarm_time():
+    return api_response({'alarmTime': alarm.time})
 
-if __name__ == "__main__":
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(func=trigger_alarm, trigger="interval", seconds=60)
-    scheduler.start()
+@app.route(f'{base_url}/alarm_state/', methods=['GET'])
+def get_alarm_state():
+    alarm_state = '🚨ARMED' if alarm.is_armed else '💤DISARMED'
+    return api_response({'alarmState': alarm_state})
 
-    # Shut down the scheduler when exiting the app
-    atexit.register(lambda: scheduler.shutdown())
 
+@scheduler.task('cron', id='trigger_alarm', hour=0, minute=40)
+def trigger_alarm():
+    print('trigger_alarm:')
+    if alarm.is_armed:
+        alarm.activate()
+        # play wake up sound
+        playsound('sfx/wakeup.mp3')
+
+    else:
+        print('alarm was disarmed, not activating')
+
+@scheduler.task('cron', id='rearm_alarm', hour=4, minute=0)
+def rearm_alarm():
+    print('rearm_alarm:')
+    if not alarm.is_armed:
+        alarm.arm()
+    else:
+        print('alarm was already armed')
+
+scheduler.start()
+
+if __name__ == "__main__":    
     app.run()

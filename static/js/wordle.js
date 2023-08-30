@@ -55,6 +55,19 @@ class API {
             app.errorPopup("A server error occurred :(");
         }
     }
+
+    async getAlarmState() {
+        let resp = await fetch(`${this.base_url}/alarm_state/`, {
+            method: "GET",
+            headers: this.headers,
+        });
+        if (resp.ok) {
+            return await resp.json();
+        } else {
+            app.errorPopup("Error fetching alarm state");
+        }
+    }
+
 }
 
 class Letter {
@@ -90,9 +103,13 @@ window.app = new Vue({
         answer: "",
         error: "",
         message: "",
+        alarmState: "",
     },
     delimiters: ['[[', ']]'],
     methods: {
+        async fetchAlarmState() {
+            
+        },
         letterShading(letterObj) {
             return {
                 "empty": !letterObj.letter,
@@ -168,6 +185,10 @@ window.app = new Vue({
                 })
 
                 styleKeys(row);
+                
+                // update alarm state
+                const alarmStateJson = await this.api.getAlarmState();
+                this.alarmState = alarmStateJson.alarmState;
 
                 this.currentIndex += 1;
                 if (this.currentIndex >= 6 || correct) await this.finishGame();
@@ -202,8 +223,12 @@ window.app = new Vue({
             this.gameID = startJson["id"];
             this.apiKey = startJson["key"];
             this.wordID = startJson["wordID"];
-
+            
             init_keyboard();
+            // update alarm state
+            const alarmStateJson = await this.api.getAlarmState();
+            this.alarmState = alarmStateJson.alarmState;
+
         },
         share() {
             const absent_emoji = "⬛️";
@@ -257,8 +282,10 @@ window.app = new Vue({
                 }
             )
         }
+    
     },
-    mounted() {
+    mounted() {  
+        this.fetchAlarmState();
         this.reset();
     }
 })

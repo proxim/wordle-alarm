@@ -1,3 +1,10 @@
+## RPi Quickstart
+`sudo pigpiod`
+`flask run --host=0.0.0.0`
+
+To power off:
+`sudo shutdown -h now`
+
 # Wordle API
 Public JSON API for Wordle with an example Vue.js [frontend](https://word.digitalnook.net).
 

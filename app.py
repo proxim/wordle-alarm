@@ -40,7 +40,7 @@ limiter = Limiter(
 scheduler = APScheduler()
 scheduler.init_app(app)
 
-alarm = Alarm()
+alarm = Alarm(armed=True)
 
 def api_response(json_data):
     resp = make_response(json.dumps(json_data))
@@ -178,7 +178,7 @@ def get_alarm_state():
     return api_response({'alarmState': alarm_state})
 
 
-@scheduler.task('cron', id='trigger_alarm', hour=0, minute=40)
+@scheduler.task('cron', id='trigger_alarm', hour=8, minute=30)
 def trigger_alarm():
     print('trigger_alarm:')
     if alarm.is_armed:
